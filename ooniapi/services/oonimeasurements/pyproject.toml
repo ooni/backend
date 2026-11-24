@@ -21,7 +21,6 @@ dependencies = [
   "python-dateutil ~= 2.9.0",
   "pydantic-settings ~= 2.1.0",
   "pydantic_extra_types ~= 2.11.1",
-  "statsd ~= 4.0.1",
   "uvicorn ~= 0.25.0",
   "httpx ~= 0.26.0",
   "pyjwt ~= 2.15.1",
@@ -102,7 +101,9 @@ branch = true
 parallel = true
 omit = [
   "src/oonimeasurements/common/*",
-  "src/oonimeasurements/__about__.py"
+  "src/oonimeasurements/__about__.py",
+  # the benchmarks run in their own workflow, not with the tests
+  "tests/bench/*",
 ]
 
 [tool.coverage.paths]

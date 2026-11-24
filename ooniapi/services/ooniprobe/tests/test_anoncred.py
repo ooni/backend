@@ -5,12 +5,19 @@ import pytest
 import ujson
 from fastapi import status
 from ooniauth_py import UserState, ServerState
+from fastapi.testclient import TestClient
+from prometheus_client import REGISTRY
 from pydantic import ValidationError
+from unittest.mock import MagicMock
+from ooniprobe.common.dependencies import get_settings
+from ooniprobe.main import app
+from ooniprobe.metrics import Metrics
 from ooniprobe.dependencies import Manifest, Match, Policy, PolicyEntry
 from ooniprobe.routers.v1.probe_services import (
     _clear_sensitive_data,
     get_ranges_from_policy,
 )
+from .conftest import BAD_FASTPATH_URL, FailingS3ClientMock, S3ClientMock
 from .utils import get_msmt_hash, getj, make_submit_request, postj, setup_user
 
 @pytest.mark.asyncio
@@ -202,6 +209,121 @@ async def test_fastpath_only_submits_once_on_success(client_with_two_working_fas
     stored = ujson.loads(mock_fastpath.uploads[expected_url])
     expected_hash = get_msmt_hash(stored, is_verified="t")
     assert msmt_uid.endswith(f"_IE_webconnectivity_{expected_hash}"), msmt_uid
+
+
+# -- What happens when no fastpath takes the measurement --------------------
+#
+# These tests use their own TestClient with raise_server_exceptions=False,
+# so an exception in the handler comes back as the 500 a probe would get in
+# production, rather than being raised inside the test.
+
+
+def _submit_as_probe(client, msm):
+    probe = TestClient(app, raise_server_exceptions=False)
+    probe.headers.update(client.headers)
+    return probe.post("/api/v1/submit_measurement", json=msm)
+
+
+@pytest.mark.asyncio
+async def test_submit_all_fastpaths_fail_saves_to_s3(client_with_no_working_fastpaths):
+    """
+    When every fastpath fails, the measurement must be saved to S3, and the
+    probe told it was accepted.
+    """
+    client, mock_fastpath, fastpath_urls = client_with_no_working_fastpaths
+    s3 = S3ClientMock()
+    app.state.s3_client = s3
+
+    user, manifest_version, _ = setup_user(client)
+    msm = make_verified_measurement(user, manifest_version)
+    resp = _submit_as_probe(client, msm)
+
+    # Every fastpath was tried
+    assert [url.rsplit("/", 1)[0] for url, _ in mock_fastpath.calls] == fastpath_urls
+
+    assert len(s3.uploads) == 1, (
+        f"the measurement should be saved to S3; got status {resp.status_code}, "
+        f"S3 uploads {list(s3.uploads)}"
+    )
+    key, body = next(iter(s3.uploads.items()))
+    assert "/postcans/" in key, key
+    stored = ujson.loads(body)
+    assert stored["is_verified"] == "t"
+    assert stored["content"]["report_id"], stored
+
+    assert resp.status_code == 200, resp.text
+
+
+@pytest.mark.asyncio
+async def test_submit_all_fastpaths_and_s3_fail_is_an_error(client_with_no_working_fastpaths):
+    """
+    When every fastpath and S3 fail, the measurement is stored nowhere, so
+    the probe must get a 5xx and keep the measurement to submit again. A 2xx
+    tells the probe the measurement was stored.
+    """
+    client, _, _ = client_with_no_working_fastpaths
+    app.state.s3_client = FailingS3ClientMock()
+
+    user, manifest_version, _ = setup_user(client)
+    msm = make_verified_measurement(user, manifest_version)
+    resp = _submit_as_probe(client, msm)
+
+    assert resp.status_code >= 500, resp.text
+
+
+@pytest.mark.asyncio
+async def test_submit_all_fastpaths_and_s3_fail_is_an_error_past_the_metric(
+    client_with_no_working_fastpaths, monkeypatch
+):
+    """
+    The same as the test above, with the fastpath send counter replaced by a
+    mock, so the handler gets past the counter and reaches the S3 fallback.
+    """
+    client, _, _ = client_with_no_working_fastpaths
+    app.state.s3_client = FailingS3ClientMock()
+    monkeypatch.setattr(Metrics, "SEND_FASTPATH_CNT", MagicMock())
+
+    user, manifest_version, _ = setup_user(client)
+    msm = make_verified_measurement(user, manifest_version)
+    resp = _submit_as_probe(client, msm)
+
+    assert resp.status_code >= 500, resp.text
+
+
+@pytest.mark.asyncio
+async def test_submit_fastpath_post_has_timeout(client_with_mocked_fastpath):
+    """
+    A fastpath that accepts the connection but never answers must not hold an
+    API thread forever: the post needs the configured timeout.
+    """
+    client, mock_fastpath, _ = client_with_mocked_fastpath
+
+    user, manifest_version, _ = setup_user(client)
+    msm = make_verified_measurement(user, manifest_version)
+    postj(client, "/api/v1/submit_measurement", msm)
+
+    timeout = app.dependency_overrides[get_settings]().fastpath_timeout
+    assert len(mock_fastpath.calls) == 1, mock_fastpath.calls
+    _, kwargs = mock_fastpath.calls[0]
+    assert kwargs.get("timeout") == timeout, kwargs
+
+
+@pytest.mark.asyncio
+async def test_submit_counts_failure_per_fastpath_instance(client_with_one_good_mocked_fastpath):
+    """
+    A failed fastpath shows up in fastpath_instance_failure, as it does for
+    the legacy report submission.
+    """
+    client, _, _ = client_with_one_good_mocked_fastpath
+    labels = {"instance": BAD_FASTPATH_URL}
+    before = REGISTRY.get_sample_value("fastpath_instance_failure_total", labels) or 0
+
+    user, manifest_version, _ = setup_user(client)
+    msm = make_verified_measurement(user, manifest_version)
+    postj(client, "/api/v1/submit_measurement", msm)
+
+    after = REGISTRY.get_sample_value("fastpath_instance_failure_total", labels) or 0
+    assert after - before == 1
 
 
 @pytest.mark.asyncio

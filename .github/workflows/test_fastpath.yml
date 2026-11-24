@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     container: debian:13
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - name: Install deps
         run: |
           apt-get update
@@ -29,7 +29,7 @@ jobs:
           fastpath/tests/test_unit.py
 
       - name: Archive code coverage HTML pages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: fastpath/htmlcov

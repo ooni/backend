@@ -1,10 +1,12 @@
-import asyncio
+import itertools
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 from limits.aio.storage import RedisStorage
 
+from oonimeasurements.common import rate_limit_quotas
 from oonimeasurements.common.rate_limit_quotas import RateLimiterMiddleware
 
 
@@ -72,21 +74,25 @@ async def test_10_per_minute(valkey_server, app):
 
     @app.get("/slow_response")
     async def slow_response():
-        await asyncio.sleep(0.02)
         return {"quota": "test"}
+
+    # The middleware charges 1 unit per 10 ms of request time, so with the
+    # real clock a slow CI runner could charge 4 or 5 units per request and
+    # use up the 10/minute quota in three. Its clock here advances 25 ms
+    # between a request's start and its response: every request costs 2.
+    clock = itertools.count(step=0.025)
+    fake_time = SimpleNamespace(perf_counter=lambda: next(clock))
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
-        prev_quota = 10
-        for _ in range(3):
-            resp = await client.get(
-                "/slow_response", headers={"X-Forwarded-For": "127.0.0.1"}
-            )
-            limit_remaining = int(resp.headers["X-RateLimit-Remaining"])
-            assert (prev_quota - limit_remaining) > 1
-            assert resp.status_code == 200
-            prev_quota = limit_remaining
+        with patch.object(rate_limit_quotas, "time", fake_time):
+            for expected in (8, 6, 4):
+                resp = await client.get(
+                    "/slow_response", headers={"X-Forwarded-For": "127.0.0.1"}
+                )
+                assert resp.status_code == 200
+                assert int(resp.headers["X-RateLimit-Remaining"]) == expected
 
         for _ in range(5):
             resp = await client.get(

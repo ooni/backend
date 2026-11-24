@@ -672,10 +672,6 @@ def get_oonirun_link_engine_descriptor(
 
     nettests, date_created = get_nettests(res, revision)
 
-    # tlsmiddlebox not yet available for ios
-    if platform == 'ios':
-        nettests = [nt for nt in nettests if nt.test_name != 'tlsmiddlebox']
-
     for nt in nettests:
         populate_dynamic_lists(nt, meta, clickhouse)
 
