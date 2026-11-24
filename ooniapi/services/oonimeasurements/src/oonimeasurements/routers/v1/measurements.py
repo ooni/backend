@@ -608,22 +608,15 @@ async def get_raw_measurement(
     You should always provide at the least one of: `report_id`, `measurement_uid`
     """
     # This is used by Explorer to let users download msmts
-    if measurement_uid:
-        log.info(f"get_raw_measurement {measurement_uid}")
-        row = await run_in_threadpool(
-            _get_fastpath_row, db, measurement_uid=measurement_uid
-        )
-
-    elif report_id:
-        log.info(f"get_raw_measurement {report_id} {input}")
-        row = await run_in_threadpool(
-            _get_fastpath_row, db, report_id=report_id, input_=input
-        )
-    else:
+    if not measurement_uid and not report_id:
         raise HTTPException(
             status_code=400,
             detail="Either report_id or measurement_uid must be provided",
         )
+
+    row = await run_in_threadpool(
+        _get_fastpath_row, db, measurement_uid, report_id, input
+    )
 
     if row is not None:
         body = await run_in_threadpool(
