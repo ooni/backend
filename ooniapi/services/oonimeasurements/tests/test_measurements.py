@@ -410,6 +410,7 @@ def test_get_measurement_meta_basic(client):
             },
             "final_analysis": None,
             "analysis_ready": False,
+            "analysis_supported": True,
         },
     }
 
@@ -463,6 +464,7 @@ def test_get_measurement_meta_input_none_from_fp(client):
             "final_analysis": None,
             # http_invalid_request_line has no delayed analysis
             "analysis_ready": True,
+            "analysis_supported": False,
         },
     }
 
@@ -503,6 +505,7 @@ def test_get_measurement_meta_full(client, monkeypatch):
             },
             "final_analysis": None,
             "analysis_ready": False,
+            "analysis_supported": True,
         },
     }
     assert raw_msm

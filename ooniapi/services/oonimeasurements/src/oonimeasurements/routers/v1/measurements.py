@@ -377,6 +377,7 @@ class MeasurementOutcome(BaseModel):
         ),
     )
     analysis_ready: bool
+    analysis_supported: bool
 
 
 class MeasurementMeta(BaseModel):
@@ -496,8 +497,9 @@ def _get_measurement_outcome(
     """
     fastpath = _get_fastpath_analysis(msmt_meta)
     final = _get_final_analysis(db, msmt_meta["measurement_uid"])
+    analysis_supported = msmt_meta["test_name"] in ANALYSED_TEST_NAMES
     # tests without delayed analysis are ready with the fastpath analysis only
-    analysis_ready = final is not None or msmt_meta["test_name"] not in ANALYSED_TEST_NAMES
+    analysis_ready = final is not None or not analysis_supported
 
     if fastpath.failure:
         fastpath_outcome = MsmtOutcome.FAILED
@@ -536,6 +538,7 @@ def _get_measurement_outcome(
         fastpath_analysis=fastpath,
         final_analysis=final,
         analysis_ready=analysis_ready,
+        analysis_supported=analysis_supported,
     )
 
 
