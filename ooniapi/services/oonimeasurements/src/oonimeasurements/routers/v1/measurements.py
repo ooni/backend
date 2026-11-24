@@ -711,21 +711,19 @@ async def get_measurement_meta(
     Get metadata on one measurement by measurement_uid or report_id + input
     """
 
-    if request.measurement_uid:
-        log.info(f"get_measurement_meta {request.measurement_uid}")
-        row = await run_in_threadpool(
-            _get_fastpath_row, db, measurement_uid=request.measurement_uid
-        )
-    elif request.report_id:
-        log.info(f"get_measurement_meta {request.report_id} {input}")
-        row = await run_in_threadpool(
-            _get_fastpath_row, db, report_id=request.report_id, input_=request.input
-        )
-    else:
+    if not request.measurement_uid and not request.report_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing measurement_uid or report_id. You should provide at the least one",
         )
+
+    row = await run_in_threadpool(
+        _get_fastpath_row,
+        db,
+        request.measurement_uid,
+        request.report_id,
+        request.input,
+    )
 
     if row is None:
         msmt_meta = MeasurementMeta()  # measurement not found
