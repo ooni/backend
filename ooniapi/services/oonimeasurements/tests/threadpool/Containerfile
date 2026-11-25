@@ -1,0 +1,11 @@
+# Image for the thread-pool load test (see README.md). Build context: the
+# service directory, for pyproject.toml.
+# python:3.11 as in the service's Dockerfile; Postgres 15 from bookworm
+FROM docker.io/library/python:3.11-slim-bookworm
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        postgresql iptables procps curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY pyproject.toml /tmp/
+# The service's dependencies, with psycopg2's binary wheel (no compiler here)
+RUN python3 -c "import tomllib; deps = tomllib.load(open('/tmp/pyproject.toml', 'rb'))['project']['dependencies']; print('\n'.join(d.replace('psycopg2 ', 'psycopg2-binary ', 1) for d in deps))" > /tmp/requirements.txt \
+    && python3 -m venv /venv && /venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt
