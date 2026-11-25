@@ -47,7 +47,15 @@ class ApiTokenCache:
         # workers.
         # pool_pre_ping replaces dead connections
         self.engine = create_engine(
-            postgresql_url, pool_pre_ping=True, connect_args={"connect_timeout": 2}
+            postgresql_url,
+            pool_pre_ping=True,
+            # Seconds to wait for a free connection when the pool is exhausted
+            pool_timeout=2,
+            connect_args={
+                "connect_timeout": 2,
+                # Milliseconds, enforced by postgres on every query
+                "options": "-c statement_timeout=2000",
+            },
         )
         self.ttl_seconds = ttl_seconds
         self._cache: Dict[str, CachedToken] = {}
