@@ -131,13 +131,13 @@ def get_token_usage(clickhouse_url: str, user_id: str):
         )
 
 
-def test_api_token_unlimited_and_recorded(token_app, client, postgresql, db):
+def test_api_token_unlimited_and_recorded(token_client, postgresql, db):
     user_id = "user-" + secrets.token_hex(4)
     token = add_token(postgresql, user_id)
     headers = {"Authorization": f"Bearer {token}"}
 
     for i in range(5):
-        resp = client.get(f"/tokentest/{i}", headers=headers)
+        resp = token_client.get(f"/tokentest/{i}", headers=headers)
         assert resp.status_code == 200
         assert "x-ratelimit-remaining" not in resp.headers
 
@@ -169,18 +169,24 @@ def test_api_token_usage_recorded_on_error(token_app, postgresql, db):
     assert rows[0]["status_code"] == 500
 
 
-def test_api_token_invalid(token_app, client, postgresql):
+def test_api_token_invalid(token_client, postgresql):
     past = datetime.now(timezone.utc) - timedelta(days=1)
     future = datetime.now(timezone.utc) + timedelta(days=1)
     expired = add_token(postgresql, "expired-user", expires_at=past)
     valid = add_token(postgresql, "valid-user", expires_at=future)
 
-    for token in (expired, TOKEN_PREFIX + "unknown"):
-        resp = client.get("/tokentest/x", headers={"Authorization": f"Bearer {token}"})
-        assert resp.status_code == 401
+    def get(token):
+        # Rejected tokens use IP quota, so each request uses a fresh address
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "X-Forwarded-For": "10.0.0." + secrets.token_hex(4),
+        }
+        return token_client.get("/tokentest/x", headers=headers)
 
-    resp = client.get("/tokentest/x", headers={"Authorization": f"Bearer {valid}"})
-    assert resp.status_code == 200
+    for token in (expired, TOKEN_PREFIX + "unknown"):
+        assert get(token).status_code == 401
+
+    assert get(valid).status_code == 200
 
     # Revoking is picked up once the cache entry expires (ttl=0 here)
     postgresql.execute(
@@ -188,14 +194,22 @@ def test_api_token_invalid(token_app, client, postgresql):
         (past, hash_token(valid)),
     )
     postgresql.commit()
-    resp = client.get("/tokentest/x", headers={"Authorization": f"Bearer {valid}"})
-    assert resp.status_code == 401
+    assert get(valid).status_code == 401
 
 
-def test_api_token_header_variants(token_app, client, postgresql):
+def test_api_token_invalid_uses_ip_quota(token_client):
+    headers = {"Authorization": f"Bearer {TOKEN_PREFIX}unknown"}
+    assert token_client.get("/tokentest/x", headers=headers).status_code == 401
+    # The quota (1/minute) is used up, so bad tokens don't reach the database
+    assert token_client.get("/tokentest/x", headers=headers).status_code == 429
+    # And it's the same quota as requests without a token
+    assert token_client.get("/tokentest/x").status_code == 429
+
+
+def test_api_token_header_variants(token_client, postgresql):
     token = add_token(postgresql, "variants-user")
     for header in (f"bearer {token}", f"BEARER {token}", f"Bearer  {token} "):
-        resp = client.get("/tokentest/x", headers={"Authorization": header})
+        resp = token_client.get("/tokentest/x", headers={"Authorization": header})
         assert resp.status_code == 200, header
         # Unlimited token path, not IP limits
         assert "x-ratelimit-remaining" not in resp.headers
@@ -214,18 +228,25 @@ def test_non_api_token_bearer_uses_ip_limits(token_app, client):
     assert "x-ratelimit-remaining" in resp.headers
 
 
-def test_api_token_db_down(app, client, valkey_server):
+def test_api_token_db_down(app, valkey_server):
     """
     If unable to authenticate tokens, return a server error
     """
     app.add_middleware(
         RateLimiterMiddleware,
         valkey_url=valkey_server,
+        rate_limits="1/minute",
         postgresql_url="postgresql://bad:bad@localhost:1/bad",
     )
 
-    resp = client.get("/version", headers={"Authorization": f"Bearer {TOKEN_PREFIX}abc"})
-    assert resp.status_code == 503
+    headers = {
+        "Authorization": f"Bearer {TOKEN_PREFIX}abc",
+        "X-Forwarded-For": "10.0.0." + secrets.token_hex(4),
+    }
+    with TestClient(app, headers=headers) as client:
+        assert client.get("/version").status_code == 503
+        # The failed lookup used up the IP quota
+        assert client.get("/version").status_code == 429
 
 
 def test_api_token_cached(app, client, valkey_server, postgresql):
