@@ -1,4 +1,5 @@
 import logging
+import secrets
 import time
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -185,6 +186,17 @@ def token_app(app, valkey_server, postgresql, db):
         return {"param": param}
 
     return app
+
+
+@pytest.fixture
+def token_client(token_app):
+    # As a context manager, requests share one event loop. 
+    # Otherwise the async valkey connection pool breaks 
+    # between requests.
+    # Each test gets its own address, so IP quota isn't shared between tests
+    headers = {"X-Forwarded-For": "10.0.0." + secrets.token_hex(4)}
+    with TestClient(token_app, headers=headers) as client:
+        yield client
 
 
 def make_override_get_settings(**kw):

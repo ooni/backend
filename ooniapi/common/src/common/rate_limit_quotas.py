@@ -200,7 +200,7 @@ class RateLimiterMiddleware:
 
         token = self.get_api_token(scope)
         if token is not None:
-            return await self.handle_token_request(token, scope, receive, send)
+            return await self.handle_token_request(token, ipaddr, scope, receive, send)
 
         RATE_LIMIT_REQUESTS.labels(auth="ip").inc()
         request_start = time.perf_counter()
@@ -231,23 +231,37 @@ class RateLimiterMiddleware:
         await self.app(scope, receive, wrapped_send)
 
     async def handle_token_request(
-        self, token: str, scope: Scope, receive: Receive, send: Send
+        self, token: str, ipaddr: str, scope: Scope, receive: Receive, send: Send
     ) -> None:
         assert self.token_cache is not None
         RATE_LIMIT_REQUESTS.labels(auth="token").inc()
         request_start = time.perf_counter()
+        hashed_ipaddr = hash_ipaddr(ipaddr, self.hashing_key)
 
-        try:
+        entry = self.token_cache.get_cached(token)
+        if entry is None:
+            # Uncached tokens are looked up in the database. They're subject to
+            # the IP quota, so made-up tokens can't be used to flood it
             with RATE_LIMIT_OVERHEAD.labels(auth="token", phase="check").time():
-                entry = await self.token_cache.get(token)
-        except Exception:
-            log.exception("Failed to look up API token")
-            API_TOKEN_LOOKUP_ERRORS.inc()
-            response = JSONResponse({"error": "could not validate token"}, 503)
-            return await response(scope, receive, send)
+                remaining = await self.get_min_available_quota(hashed_ipaddr)
+            if remaining <= 0:
+                RATE_LIMIT_HITS.labels(auth="token").inc()
+                response = JSONResponse({"error": "quota exceeded"}, 429)
+                return await response(scope, receive, send)
+
+            try:
+                with RATE_LIMIT_OVERHEAD.labels(auth="token", phase="check").time():
+                    entry = await self.token_cache.get(token)
+            except Exception:
+                log.exception("Failed to look up API token")
+                API_TOKEN_LOOKUP_ERRORS.inc()
+                await self.charge_ip_quota(hashed_ipaddr, request_start)
+                response = JSONResponse({"error": "could not validate token"}, 503)
+                return await response(scope, receive, send)
 
         if entry is None or not entry.is_valid():
             API_TOKEN_REJECTED.inc()
+            await self.charge_ip_quota(hashed_ipaddr, request_start)
             response = JSONResponse({"error": "invalid token"}, 401)
             return await response(scope, receive, send)
 
@@ -276,6 +290,15 @@ class RateLimiterMiddleware:
             raise
         # The response has been sent already, so the client doesn't wait for this
         await self.record_token_usage(entry, scope, status_code, cost)
+
+    async def charge_ip_quota(self, hashed_ipaddr: str, request_start: float) -> None:
+        """
+        Charges token requests that weren't authenticated (invalid token or
+        database error) to the IP quota
+        """
+        cost = max([int((time.perf_counter() - request_start) * 100), 1])
+        with RATE_LIMIT_OVERHEAD.labels(auth="token", phase="consume").time():
+            await self.consume_rate_limits(hashed_ipaddr, cost=cost)
 
     async def record_token_usage(
         self, entry: CachedToken, scope: Scope, status_code: int, cost: int
