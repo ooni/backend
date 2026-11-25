@@ -56,6 +56,15 @@ class ApiTokenCache:
         with Session(self.engine) as session:
             return session.get(ApiToken, token_hash)
 
+    def get_cached(self, token: str) -> Optional[CachedToken]:
+        """
+        Returns the token if it's cached and fresh, without querying the database
+        """
+        entry = self._cache.get(hash_token(token))
+        if entry is not None and time.monotonic() - entry.fetched_at < self.ttl_seconds:
+            return entry
+        return None
+
     async def get(self, token: str) -> Optional[CachedToken]:
         """
         Returns the token if it exists, None otherwise.
@@ -63,11 +72,13 @@ class ApiTokenCache:
 
         Raises if the database can't be reached and the token is not cached
         """
-        token_hash = hash_token(token)
-        entry = self._cache.get(token_hash)
-        if entry is not None and time.monotonic() - entry.fetched_at < self.ttl_seconds:
-            return entry
+        cached = self.get_cached(token)
+        if cached is not None:
+            return cached
 
+        token_hash = hash_token(token)
+        # Possibly stale, used if the database can't be reached
+        entry = self._cache.get(token_hash)
         try:
             row = await run_in_threadpool(self._fetch, token_hash)
         except Exception:
