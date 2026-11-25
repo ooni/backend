@@ -7,11 +7,11 @@ from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 from sqlalchemy import Engine, create_engine, text
-from starlette.concurrency import run_in_threadpool
 
 from .common.clickhouse_utils import async_query_click
 from .common.dependencies import get_clickhouse_session, get_settings
 from .common.metrics import mount_metrics
+from .common.apiauth.tokens import PG_TCP_ARGS, ThreadBudget
 from .common.rate_limit_quotas import RateLimiterMiddleware
 from .common.version import get_build_label, get_pkg_version
 from .routers.data import (
@@ -39,8 +39,15 @@ def get_health_postgresql_engine(postgresql_url: str) -> Engine:
     #
     # pool_pre_ping replaces dead connections
     return create_engine(
-        postgresql_url, pool_pre_ping=True, connect_args={"connect_timeout": 2}
+        postgresql_url,
+        pool_pre_ping=True,
+        pool_timeout=2,
+        connect_args={"connect_timeout": 2, **PG_TCP_ARGS},
     )
+
+
+# One thread: while a check is stuck, the next ones fail after 2 s
+HEALTH_POSTGRESQL_THREADS = ThreadBudget(1, 2)
 
 
 def check_postgresql(postgresql_url: str) -> None:
@@ -114,7 +121,7 @@ def setup_router(app: FastAPI):
         # would make the load balancer take down the API for everyone
         warnings = []
         try:
-            await run_in_threadpool(check_postgresql, settings.postgresql_url)
+            await HEALTH_POSTGRESQL_THREADS.run(check_postgresql, settings.postgresql_url)
         except Exception as exc:
             log.error(exc)
             warnings.append("postgresql_error")
