@@ -20,10 +20,14 @@ if config.config_file_name is not None:  # no cov
 target_metadata = None
 
 section = config.config_ini_section
+# configparser treats "%" as interpolation syntax, so escape it; otherwise
+# URLs with percent-encoded passwords are rejected.
 config.set_section_option(
     section,
     "OONI_PG_URL",
-    os.environ.get("OONI_PG_URL", "postgresql://oonipg:oonipg@localhost/oonipg"),
+    os.environ.get(
+        "OONI_PG_URL", "postgresql://oonipg:oonipg@localhost/oonipg"
+    ).replace("%", "%%"),
 )
 
 # other values from the config, defined by the needs of env.py,
