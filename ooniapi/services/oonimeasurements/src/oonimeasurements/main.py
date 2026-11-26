@@ -10,6 +10,7 @@ from sqlalchemy import Engine, create_engine, text
 from starlette.concurrency import run_in_threadpool
 
 from .common.clickhouse_utils import async_query_click
+from .common.config import Settings
 from .common.dependencies import get_clickhouse_session, get_settings
 from .common.metrics import mount_metrics
 from .common.rate_limit_quotas import RateLimiterMiddleware
@@ -148,18 +149,24 @@ def setup_router(app: FastAPI):
         return {"message": "Hello OONItarian"}
 
 
+def setup_rate_limiter(app: FastAPI, settings: Settings):
+    # This function makes this setup mockable on tests
+    app.add_middleware(
+        RateLimiterMiddleware,
+        valkey_url=settings.valkey_url,
+        hashing_key=settings.account_id_hashing_key,
+        rate_limits=settings.rate_limits,
+        whitelisted_ipaddrs=settings.rate_limits_whitelisted_ipaddrs,
+        unmetered_pages=settings.rate_limits_unmetered_pages,
+        postgresql_url=settings.postgresql_url,
+        # Token usage isn't recorded without a clickhouse url
+        clickhouse_url=settings.clickhouse_url if settings.api_token_usage_enabled else None,
+        api_token_cache_ttl=settings.api_token_cache_ttl,
+    )
+
+
 settings = get_settings()
 
 app = create_app()
 setup_router(app)
-app.add_middleware(
-    RateLimiterMiddleware,
-    valkey_url=settings.valkey_url,
-    hashing_key=settings.account_id_hashing_key,
-    rate_limits=settings.rate_limits,
-    whitelisted_ipaddrs=settings.rate_limits_whitelisted_ipaddrs,
-    unmetered_pages=settings.rate_limits_unmetered_pages,
-    postgresql_url=settings.postgresql_url,
-    clickhouse_url=settings.clickhouse_url,
-    api_token_cache_ttl=settings.api_token_cache_ttl,
-)
+setup_rate_limiter(app, settings)
