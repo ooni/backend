@@ -13,7 +13,9 @@ from limits.aio.storage import RedisStorage
 from oonimeasurements.common import rate_limit_quotas
 from oonimeasurements.common.clickhouse_utils import query_click
 from oonimeasurements.common.apiauth.tokens import TOKEN_PREFIX, hash_token
+from oonimeasurements.common.config import Settings
 from oonimeasurements.common.rate_limit_quotas import RateLimiterMiddleware
+from oonimeasurements.main import setup_rate_limiter
 
 from .utils import get_postgresql_url
 
@@ -273,3 +275,23 @@ def test_api_token_cached(app, client, valkey_server, postgresql):
     postgresql.commit()
     resp = client.get("/version", headers=headers)
     assert resp.status_code == 200
+
+
+@pytest.mark.parametrize("enabled,rows", [("true", 1), ("false", 0)])
+def test_api_token_usage_enabled_flag(
+    app, valkey_server, postgresql, db, monkeypatch, enabled, rows
+):
+    monkeypatch.setenv("API_TOKEN_USAGE_ENABLED", enabled)
+    settings = Settings(
+        valkey_url=valkey_server,
+        postgresql_url=get_postgresql_url(postgresql),
+        clickhouse_url=db,
+    )
+    setup_rate_limiter(app, settings)
+
+    user_id = "user-" + secrets.token_hex(4)
+    token = add_token(postgresql, user_id)
+    with TestClient(app, headers={"Authorization": f"Bearer {token}"}) as client:
+        assert client.get("/version").status_code == 200
+
+    assert len(get_token_usage(db, user_id)) == rows
