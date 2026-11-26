@@ -150,7 +150,7 @@ def setup_router(app: FastAPI):
 
 
 def setup_rate_limiter(app: FastAPI, settings: Settings):
-    # This function makes this setup mockable on tests
+    # This function makes this setup easier to test
     app.add_middleware(
         RateLimiterMiddleware,
         valkey_url=settings.valkey_url,
