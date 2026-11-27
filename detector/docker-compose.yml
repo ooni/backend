@@ -1,0 +1,13 @@
+# Usage: docker-compose run --rm detector ./detector/detector.py --devel
+
+version: '3.9'
+
+services:
+  detector:
+    restart: always
+    build:
+      context: .
+    command: detector
+    volumes:
+      - ./:/opt/detector
+      - ../:/repo

@@ -1,3 +1,9 @@
+detector (0.3) unstable; urgency=medium
+
+  * Implement event detector for social media using Clickhouse
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 11 Nov 2022 18:08:26 +0000
+
 detector (0.2) unstable; urgency=medium
 
   * run webapp as a dedicated service
