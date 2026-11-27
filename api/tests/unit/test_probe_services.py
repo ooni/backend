@@ -13,7 +13,6 @@ def test_web_test_helpers(mock):
             "https://1.th.ooni.org",
             "https://2.th.ooni.org",
             "https://3.th.ooni.org",
-            "https://4.th.ooni.org",
         ]
     )
     r2 = round_robin_web_test_helpers()
