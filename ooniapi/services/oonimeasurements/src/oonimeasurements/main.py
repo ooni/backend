@@ -37,8 +37,9 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        # allow from observable notebooks
-        allow_origin_regex=r"^https://[-A-Za-z0-9]+(\.(test|dev))?\.ooni\.(org|io)$|^https://.*\.observableusercontent\.com$",
+        # allow from observable notebooks, and from Comma (https://frankbueltge.de/comma/),
+        # a non-commercial live sound work that plays OONI's measurements
+        allow_origin_regex=r"^https://[-A-Za-z0-9]+(\.(test|dev))?\.ooni\.(org|io)$|^https://.*\.observableusercontent\.com$|^https://frankbueltge\.de$",
         # allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$",
         allow_credentials=True,
         allow_methods=["*"],
