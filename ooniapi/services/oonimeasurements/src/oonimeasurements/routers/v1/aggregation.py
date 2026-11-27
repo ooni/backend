@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
-from sqlalchemy.sql.expression import and_, column, select
+from sqlalchemy.sql.expression import and_, column, select, union_all
 from sqlalchemy.sql.expression import table as sql_table
 from sqlalchemy.sql.expression import text as sql_text
 from typing_extensions import Annotated
@@ -71,10 +71,87 @@ def group_by_date(since, until, time_grain, cols, colnames, group_by):
     )
     fun = gmap[time_grain]
     tcol = "measurement_start_day"  # TODO: support dynamic axis names
-    cols.append(sql_text(f"{fun}(measurement_start_time) AS {tcol}"))
+    # buckets of a day or more come from the day, which gives the same value
+    # and lets full days be read from the agg_day_cc_asn_test projection
+    t = "measurement_start_time" if fun == "toStartOfHour" else "toDate(measurement_start_time)"
+    bucket = t if fun == "toDate" else f"{fun}({t})"
+    cols.append(sql_text(f"{bucket} AS {tcol}"))
     colnames.append(tcol)
     group_by.append(column(tcol))
     return time_grain
+
+
+# The agg_day_cc_asn_test projection on fastpath keeps the counts below per
+# day, probe_cc, probe_asn and test_name. Aggregations that filter and group by
+# nothing else read the whole days of their window from it, and only partial
+# days at either end from fastpath itself.
+PROJECTION_AXES = (None, "measurement_start_day", "probe_cc", "probe_asn", "test_name")
+COUNT_COLUMNS = ("anomaly_count", "confirmed_count", "failure_count", "ok_count", "measurement_count")
+
+
+def projection_serves(domains, inp, category_code, ooni_run_link_id, axis_x, axis_y, time_grain) -> bool:
+    if domains or inp or category_code or ooni_run_link_id:
+        return False
+    if axis_x not in PROJECTION_AXES or axis_y not in PROJECTION_AXES:
+        return False
+    # hourly buckets need the time of day, which the projection does not keep
+    return not ("measurement_start_day" in (axis_x, axis_y) and time_grain == "hour")
+
+
+def _midnight(t: datetime) -> datetime:
+    return t.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def split_by_full_days(cols, where, table, group_by, query_params, since, until):
+    """
+    The aggregation over [since, until) as the sum of its whole days, which the
+    projection answers, and the partial days at either end, read from fastpath.
+    Every measurement falls in exactly one part, so the sums equal the counts
+    of the single query. None when the window holds no whole day.
+    """
+    first_day = _midnight(since) if since == _midnight(since) else _midnight(since) + timedelta(days=1)
+    end_day = _midnight(until)
+    if first_day >= end_day:
+        return None
+    query_params.update(
+        first_full_day=first_day.date(),
+        end_full_day=end_day.date(),
+        full_days_since=first_day,
+        full_days_until=end_day,
+    )
+
+    def part(*window):
+        q = select(*cols).where(and_(*where, *window)).select_from(table)
+        for g in group_by:
+            q = q.group_by(g)
+        return q
+
+    parts = [
+        part(
+            sql_text("toDate(measurement_start_time) >= :first_full_day"),
+            sql_text("toDate(measurement_start_time) < :end_full_day"),
+        )
+    ]
+    if since < first_day:
+        parts.append(
+            part(
+                sql_text("measurement_start_time >= :since"),
+                sql_text("measurement_start_time < :full_days_since"),
+            )
+        )
+    if end_day < until:
+        parts.append(
+            part(
+                sql_text("measurement_start_time >= :full_days_until"),
+                sql_text("measurement_start_time < :until"),
+            )
+        )
+    by_part = (union_all(*parts) if len(parts) > 1 else parts[0]).subquery("by_part")
+    keys = [column(g.name) for g in group_by]
+    query = select(*[sql_text(f"sum({c}) AS {c}") for c in COUNT_COLUMNS], *keys).select_from(by_part)
+    for k in keys:
+        query = query.group_by(k).order_by(k)
+    return query
 
 
 def validate_axis_name(axis):
@@ -350,12 +427,13 @@ async def get_measurements(
         where.append(sql_text("ooni_run_link_id IN :ooni_run_link_id_s"))
         query_params["ooni_run_link_id_s"] = ooni_run_link_id_s
 
+    time_where = []
     if since:
-        where.append(sql_text("measurement_start_time >= :since"))
+        time_where.append(sql_text("measurement_start_time >= :since"))
         query_params["since"] = since
 
     if until:
-        where.append(sql_text("measurement_start_time < :until"))
+        time_where.append(sql_text("measurement_start_time < :until"))
         query_params["until"] = until
 
     if test_name_s:
@@ -390,13 +468,16 @@ async def get_measurements(
             sql_text("citizenlab.url = fastpath.input"),
         )
 
-    where_expr = and_(*where)
-    query = select(*cols).where(where_expr).select_from(table)
+    query = None
+    if since and until and projection_serves(
+        domain_s, inp, category_code, ooni_run_link_id_raw, axis_x, axis_y, time_grain
+    ):
+        query = split_by_full_days(cols, where, table, group_by, query_params, since, until)
+    if query is None:
+        query = select(*cols).where(and_(*where, *time_where)).select_from(table)
+        for g in group_by:
+            query = query.group_by(g).order_by(g)
     log.debug(f"aggregations query: {query}")
-
-    # Add group-by
-    for g in group_by:
-        query = query.group_by(g).order_by(g)
 
     try:
         if dimension_cnt > 0:
