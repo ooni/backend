@@ -7,7 +7,7 @@ Measurements that were submitted to the OONI Probe API service but failed to sub
 ## Environment variables
 
 Required:
-- **BUCKET_NAME** — name of the failed-reports S3 bucket
+- **S3_BUCKET_NAME** — name of the failed-reports S3 bucket
 - **FASTPATH_API** — FastPath API endpoint (measurements are POSTed here)
 
 Required if not using an IAM role/profile:
@@ -19,7 +19,7 @@ Optional:
 - **ROLE_SESSION_NAME** — default: `"assume-role-session"`
 - **ROLE_DURATION_SECONDS** — default: `"3600"`
 - **AWS_REGION** — default: `"eu-central-1"`
-- **PREFIX** — S3 path prefix used to limit the paths scanned
+- **S3_PREFIX** — S3 path prefix used to limit the paths scanned, e.g. `postcans/`. Only `.post` objects are submitted.
 
 ## Usage
 
