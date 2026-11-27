@@ -400,12 +400,24 @@ class URLListManager:
     def write_changes_log(
         self, account_id: str, cc: str, old_entry: dict, new_entry: dict
     ):
+        """Track a single logical add/update/delete for account_id.
+
+        This log is the source of truth _rebase_user_branch_onto_master()
+        replays onto a fresh copy of master before pushing (see that
+        method's docstring), so it needs to describe the *net* effect of
+        this account's session, not just each individual update() call.
+        """
         changeset = self.read_changes_log(account_id)
         cc_changeset = changeset.setdefault(cc, [])
 
+        # True if old_entry was itself something this same session added
+        # earlier (never part of master) rather than pre-existing master
+        # content.
+        old_was_session_local_add = False
         if old_entry:
             try:
                 changeset[cc].remove(dict(old_entry, **{"action": "add"}))
+                old_was_session_local_add = True
             except ValueError:
                 # Not part of the changeset, no problem
                 pass
@@ -420,7 +432,14 @@ class URLListManager:
 
             changeset[cc].append(dict(new_entry, **{"action": "add"}))
 
-        elif old_entry:
+        elif old_entry and not old_was_session_local_add:
+            # Deleting pre-existing master content - track it so it gets
+            # removed again on replay. If old_entry WAS a session-local
+            # add instead (handled above), it never reached master in
+            # the first place, so deleting it nets out to nothing: no
+            # delete op should be logged, or replay would later try to
+            # remove a row that was never really there and fail with a
+            # spurious "the list has changed" error.
             changeset[cc].append(dict(old_entry, **{"action": "delete"}))
 
         with self._get_user_changes_path(account_id).open("w") as out_file:
@@ -727,10 +746,164 @@ class URLListManager:
             )
         return j["state"] != "open"
 
+    @timer(name="citizenlab_rebase_onto_master")
+    def _rebase_user_branch_onto_master(self, account_id: str):
+        """Rebuild the user's branch on top of the current tip of master.
+
+        Without this, a user's branch/worktree is only ever cut from
+        master *once* - in _get_user_repo(), the first time the account
+        starts editing - and is never touched again no matter how far
+        master moves in the meantime, even though _pull_origin_repo()/
+        _init_repo() keep the shared repo's own copy of master itself
+        genuinely fresh on every request. citizenlab/test-lists#2257 is
+        a real example of the result: three commits made back in March
+        against a master from that time, pushed and PR'd in August
+        against a master that has since moved on by five months of
+        other contributors' merged changes.
+
+        This deliberately does *not* do a textual `git rebase` of the
+        branch's raw commits. Every edit here is a single-row append to
+        a shared CSV (see update()), and the busiest of these files
+        (e.g. lists/global.csv, which the real repo's history shows
+        growing via a steady stream of individual "Added <url> to
+        GLOBAL.csv" commits) receive many such appends from unrelated
+        contributors on an ongoing basis. Two independent end-of-file
+        insertions with nothing else in common are exactly what git's
+        3-way merge treats as a conflict - verified directly against
+        real git, not a dulwich quirk, and the same reason CHANGELOG.md
+        merge conflicts are proverbial - so replaying old commits onto a
+        master with *any* newer, unrelated addition to the same file
+        would still conflict even though the two changes have nothing to
+        do with each other. That would just turn today's silent,
+        eventually-discovered GitHub conflict into an immediate failure
+        on nearly every submission.
+
+        Instead, this replays the user's own tracked, structured changes
+        (read_changes_log(); see write_changes_log()) directly on top of
+        whatever lists/<cc>.csv actually contains on master right now -
+        the same net effect update() itself applies for a single change.
+        The result is a branch that differs from the current tip of
+        master by exactly this account's pending edits and nothing else,
+        which always applies/merges cleanly on GitHub.
+
+        Raises CannotUpdateList or DuplicateURLError if replaying a
+        change is genuinely no longer possible against current master
+        content (someone else already removed the exact row this branch
+        wants to delete, or already added the exact URL this branch
+        wants to add) - a real conflict that needs the user to reload
+        and reapply their change, exactly like the existing race-
+        condition check update() itself does for a single edit.
+        """
+        changes_log = self.read_changes_log(account_id)
+        # A cc key can be present with an empty op list - e.g. an add
+        # immediately followed by a delete of that same row within one
+        # session nets out to nothing (see write_changes_log()) but still
+        # leaves cc as a dict key. Only cc's with at least one real op
+        # need to be read or rewritten.
+        touched_ccs = [cc for cc, ops in changes_log.items() if ops]
+        if not touched_ccs:
+            # Nothing left to replay - either changes.pickle predates
+            # this being written, the branch has drifted in some other
+            # unexpected way, or every tracked entry canceled itself out.
+            # Leave the branch as-is rather than guessing; the existing
+            # uncommitted-changes check in _push_to_repo() already guards
+            # the one case we know can otherwise land silently broken
+            # content.
+            return
+
+        branch_name = self._get_user_branchname(account_id)
+        user_repo_path = self._get_user_repo_path(account_id)
+
+        with git.Repo(self.repo_dir) as shared_repo:
+            master_sha = _read_ref(shared_repo, "refs/heads/master")
+
+        # Compute the final content for every touched country code
+        # entirely against the shared repo's own checkout of master
+        # (never touching the user's worktree) before committing to
+        # anything, so a conflict found partway through - say, the 2nd
+        # of 3 touched files - never leaves the worktree half-rebuilt.
+        rows_by_cc: Dict[str, List[Dict[str, str]]] = {}
+
+        def get_rows(cc: str) -> List[Dict[str, str]]:
+            if cc not in rows_by_cc:
+                csv_path = self.repo_dir / "lists" / f"{cc}.csv"
+                with csv_path.open() as f:
+                    rows_by_cc[cc] = list(csv.DictReader(f))
+            return rows_by_cc[cc]
+
+        for cc in touched_ccs:
+            rows = get_rows(cc)
+            for op in changes_log[cc]:
+                entry = {k: op[k] for k in CITIZENLAB_CSV_HEADER}
+                action = op["action"]
+                if action == "delete":
+                    try:
+                        rows.remove(entry)
+                    except ValueError:
+                        raise CannotUpdateList(
+                            description="The URL list has changed since "
+                            "this change was made: the entry to delete "
+                            "is no longer present. Please reload and "
+                            "reapply your changes."
+                        )
+                elif action == "add":
+                    duplicate_pool = list(rows)
+                    if cc != "global":
+                        duplicate_pool += get_rows("global")
+                    if any(r["url"] == entry["url"] for r in duplicate_pool):
+                        raise DuplicateURLError(
+                            description=f"{entry['url']} is duplicate",
+                            err_args={"url": entry["url"]},
+                        )
+                    rows.append(entry)
+                else:
+                    raise AssertionError(
+                        f"unknown changes_log action {action!r}"
+                    )
+
+        log.debug(
+            f"[git-debug] account={account_id} branch {branch_name} "
+            f"rebuilding onto master={master_sha} (touching {touched_ccs})"
+        )
+
+        with git.Repo(user_repo_path) as user_repo:
+            old_head = _read_ref(user_repo, f"refs/heads/{branch_name}")
+
+            # Hard-reset the worktree's branch to master's current tip.
+            # This is a plain, linear move onto master - not a merge -
+            # so it cannot itself conflict; any orphaned old commits on
+            # the branch are simply left unreferenced.
+            git.reset(user_repo, "hard", master_sha)
+
+            for cc in touched_ccs:
+                csv_path = user_repo_path / "lists" / f"{cc}.csv"
+                with csv_path.open("w") as f:
+                    writer = csv.DictWriter(
+                        f,
+                        quoting=csv.QUOTE_MINIMAL,
+                        lineterminator="\n",
+                        fieldnames=CITIZENLAB_CSV_HEADER,
+                    )
+                    writer.writeheader()
+                    for row in rows_by_cc[cc]:
+                        writer.writerow(row)
+                git.add(repo=user_repo, paths=[csv_path.as_posix()])
+
+            bot_identity = f"{self.github_user} <{self.github_user}@users.noreply.github.com>".encode()
+            new_head = git.commit(
+                user_repo,
+                message=b"Reapply pending test-lists.ooni.org changes onto latest master",
+                author=bot_identity,
+                committer=bot_identity,
+            )
+            log.debug(
+                f"[git-debug] account={account_id} branch {branch_name} "
+                f"rebuilt onto master: old_head={old_head} new_head={new_head}"
+            )
+
     def _push_to_repo(self, account_id):
         with git.Repo(self.repo_dir) as repo:
             branch_name = self._get_user_branchname(account_id)
-            local_head = _read_ref(repo, f"refs/heads/{branch_name}")
 
             # NOTE: comparing refs/heads/<branch> in the shared repo against
             # HEAD in the user's worktree is *not* a useful check on its
@@ -750,8 +923,7 @@ class URLListManager:
                     dirty = git.status(user_repo)
                     log.debug(
                         f"[git-debug] account={account_id} pushing {branch_name} "
-                        f"to GitHub, local_head={local_head} "
-                        f"worktree_head={worktree_head} status={dirty}"
+                        f"to GitHub, worktree_head={worktree_head} status={dirty}"
                     )
                     has_uncommitted = bool(
                         any(dirty.staged.values()) or dirty.unstaged
@@ -775,13 +947,23 @@ class URLListManager:
                             description="The user's worktree has uncommitted "
                             "changes that never made it into a commit"
                         )
+
+                # The worktree is clean, so it's safe to rebuild the
+                # branch onto the freshly-pulled origin/master (see
+                # _rebase_user_branch_onto_master's docstring) before
+                # pushing. This is what actually prevents merge conflicts
+                # on the resulting GitHub PR, e.g.
+                # citizenlab/test-lists#2257, where the pushed branch was
+                # based on a master commit from many months earlier.
+                self._rebase_user_branch_onto_master(account_id)
             else:
                 log.debug(
                     f"[git-debug] account={account_id} pushing {branch_name} "
-                    f"to GitHub, local_head={local_head} (no worktree checked "
-                    "out - nothing to verify)"
+                    "to GitHub (no worktree checked out - nothing to "
+                    "verify or rebuild)"
                 )
 
+            local_head = _read_ref(repo, f"refs/heads/{branch_name}")
             refspec = f"refs/heads/{branch_name}:refs/heads/{branch_name}"
             git.push(repo, "rworigin", refspecs=[refspec], force=True)
             log.debug(
@@ -802,10 +984,21 @@ class URLListManager:
         the failure; retrying is expected to work once the underlying
         issue clears, and no change is lost even if the push succeeded but
         opening the PR failed, since submit() can simply be called again.
+
+        The one exception is a BaseOONIException raised out of
+        _push_to_repo() (currently: CannotUpdateList or DuplicateURLError
+        from _rebase_user_branch_onto_master finding a genuine conflict
+        against master's current content) - that's re-raised as-is rather
+        than wrapped in CannotProposeChanges, because its "just retry"
+        framing doesn't apply: retrying submit() again hits the exact
+        same conflict every time until the user reloads and reapplies
+        their change.
         """
         log.debug("proposing changes")
         try:
             self._push_to_repo(account_id)
+        except BaseOONIException:
+            raise
         except Exception:
             log.exception(f"[git-debug] account={account_id} failed to push to repo")
             raise CannotProposeChanges()
