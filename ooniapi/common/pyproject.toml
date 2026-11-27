@@ -46,5 +46,8 @@ Documentation = "https://github.com/ooni/backend"
 Issues = "https://github.com/ooni/backend/issues"
 Source = "https://github.com/ooni/backend"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/common"]
+
 [tool.hatch.envs.test]
 dependencies = ["coverage[toml]", "pytest", "pytest-cov", "click", "black"]
